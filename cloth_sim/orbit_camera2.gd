@@ -12,7 +12,7 @@ export var verticalSensitivity : float = 0.002
 export var horizontalSensitivity : float = 0.002
 export var camYOffset : float = 4.0
 export var camLerpSpeed : float = 16.0
-export(NodePath) var target
+export(NodePath) var target=null
 
 # Private variables
 var _camTarget : Spatial = null
@@ -21,7 +21,11 @@ var _curZoom : float = 0.0
 var pressed=false
 
 func _ready() -> void:
-    _camTarget = get_node(target)
+    if target!=null:
+        _camTarget = get_node(target)
+    else:
+        _camTarget=Position3D.new()
+        add_child(_camTarget)
     _cam = get_node("ClippedCamera")
     _cam.translate(Vector3(0,camYOffset,maxZoom))
     _curZoom = maxZoom

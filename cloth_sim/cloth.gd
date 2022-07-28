@@ -13,6 +13,7 @@ var mesh_debug:MeshInstance=null
 var link_debug:MeshInstance=null
 var mesh_node:MeshInstance=null
 var do_simu=false
+var bvh:BVH
 
 var gravity=Vector3(0,-9.8,0)
 
@@ -40,7 +41,6 @@ class NodeCloth:
         else:
             im=1/w
     
-
 class LinkCloth:
     var r_l:float
     var st:float
@@ -52,8 +52,18 @@ class LinkCloth:
         r_l=_r_l
         r_l_2=r_l*r_l
 
+class FaceCloth:
+    var ns;
+    var ls;
+    var normal;
+    var aabb:AABB;
+    var layer;
+    var face_exclusion;
+    var center
+
 var nodes=Array()
 var links=Array()
+var faces=Array()
 
 func cal_v_ind_above_2(v_id):
     return v_id+node_w_num*2
@@ -223,6 +233,24 @@ func add_link(node1_id, node2_id, st, r_l, link_type):
     link.type=link_type
     links.append(link)
 
+func add_face(n_id1, n_id2, n_id3):
+    var face:=FaceCloth.new()
+    face.ns=[n_id1, n_id2, n_id3]
+    var link1_id=get_link_by_nodes(n_id1, n_id2)
+    var link2_id=get_link_by_nodes(n_id2, n_id3)
+    var link3_id=get_link_by_nodes(n_id3, n_id1)
+    face.ls=[link1_id, link2_id, link3_id]
+    face.normal=bvh.cal_face_normal(face)
+    face.aabb=bvh.cal_face_aabb(face)
+    face.layer=1
+    face.face_exclusion="SAME"
+
+func get_link_by_nodes(n1_id, n2_id):
+    for i in range(links):
+        if links[i].node1.id==n1_id and links[i].node2.id==n2_id or links[i].node1.id==n2_id and links[i].node2.id==n1_id:
+            return i
+    return -1
+
 func node_coor_2_id(pos:Vector2):
     return pos.y*node_w_num+pos.x
 
@@ -233,6 +261,7 @@ func node_id_2_coor(id)->Vector2:
     return ret
 
 func _ready():
+    bvh=BVH.new()
     mesh_node=get_node("ClothMesh")
     mesh_node.mesh=mesh_node.mesh
     node_w_num=node_dense*cloth_w+1
@@ -312,6 +341,12 @@ func _ready():
                 add_link(v_id, cal_v_ind_right_2(v_id), 1, w_step*2, LinkType.BEND)
             if j<node_h_num-2:
                 add_link(v_id, cal_v_ind_above_2(v_id), 1, h_step*2, LinkType.BEND)
+    for j in range(node_h_num-1):
+        for i in range(node_w_num-1):
+            var v_id=i+j*node_w_num
+            add_face(v_id, cal_v_ind_above(v_id), cal_v_ind_right_above(v_id))
+            add_face(v_id, cal_v_ind_right_above(v_id), cal_v_ind_right(v_id))
+    bvh.create_bvh(faces)
 
 func solve_links():
     for i in range(links.size()):
